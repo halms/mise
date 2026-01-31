@@ -26,9 +26,17 @@ pub async fn uv_venv(config: &Arc<Config>, ts: &Toolset) -> &'static Option<Venv
             let venv_path = uv_root.join(".venv");
             if !venv_path.exists() {
                 if uv_auto.should_create() {
-                    if let Err(err) =
-                        create_python_venv(config, ts, &venv_path, EnvMap::new(), None, None, None, true)
-                            .await
+                    if let Err(err) = create_python_venv(
+                        config,
+                        ts,
+                        &venv_path,
+                        EnvMap::new(),
+                        None,
+                        None,
+                        None,
+                        true,
+                    )
+                    .await
                     {
                         warn_once!(
                             "uv venv creation failed at: {p}\n\n{err}",
