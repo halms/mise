@@ -92,6 +92,7 @@ fn build_stdlib_venv_command<'a>(
         .args(extra)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn create_python_venv(
     config: &Arc<Config>,
     ts: &Toolset,
