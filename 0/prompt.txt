@@ -1,0 +1,141 @@
+<pasted_content id="15da">
+mise global minimum release age overrides per-tool setting?
+
+No. The per-tool minimum_release_age overrides the global setting, not the other way around.
+
+For example, in mise.toml:
+[settings]
+minimum_release_age = "7d"
+
+[tools]
+node = "latest"                                 # 7 days
+python = { version = "latest", minimum_release_age = "3d" }
+bun = { version = "latest", minimum_release_age = "0s" }
+
+The precedence is:
+
+    CLI --minimum-release-age (highest priority)
+
+    Per-tool minimum_release_age
+
+    Global [settings].minimum_release_age
+
+    Built-in default (24h)
+
+This is confirmed by mise's current implementation and documentation. 
+GitHub
++2
+
+Caveat: The age restriction applies to fuzzy versions (latest, 24, etc.), not explicitly pinned versions such as 24.11.1. It also depends on whether the backend provides release timestamps. 
+GitHub
+it ignores it a the initial install?
+
+No, minimum_release_age should also apply to the initial installation, provided you're installing a fuzzy version such as latest.
+
+For example:
+[settings]
+minimum_release_age = "7d"
+
+[tools]
+node = "latest"
+bun = { version = "latest", minimum_release_age = "0s" }
+
+On a fresh mise install, Node should respect the 7-day restriction, while Bun should install the latest stable release.
+
+However, there are known bugs:
+
+    Backend-specific behavior: Some backends don't consistently enforce release-age filtering.
+
+    Incorrect timestamps: An 
+    August 2026 report
+     
+    describes mise use installing a release from the previous day despite a 7-day restriction.
+
+    Version metadata issues: Stale or incomplete metadata has caused incorrect version selection. 
+    GitHub
+    +1
+
+To investigate, compare:
+
+mise latest node
+mise latest --minimum-release-age=7d node
+mise install -vv
+
+Which tool and backend are you seeing this with (aqua:, github:, npm:, etc.)? That matters because release-age enforcement isn't equally reliable across backends.
+mise use -g --tool-option minimum_release_age=0s github:Kpler/kp-cli
+
+Yes, that's the correct syntax:
+
+mise use -g --tool-option minimum_release_age=0s github:Kpler/kp-cli
+
+It should:
+
+    Add github:Kpler/kp-cli to your global mise config.
+
+    Store minimum_release_age = "0s" as a per-tool option.
+
+    Disable the global release-age restriction for this tool, including its initial installation.
+
+Expected configuration:
+[tools]
+"github:Kpler/kp-cli" = { version = "latest", minimum_release_age = "0s" }
+
+This is supported explicitly by mise's documentation. 
+mise-en-place
++1
+
+If the initial installation still selects an older version, try:
+
+mise use -g --minimum-release-age=0s \
+  --tool-option minimum_release_age=0s github:Kpler/kp-cli
+
+The distinction is that --minimum-release-age overrides version resolution for the current command, while --tool-option persists the override in your configuration.
+
+If only the second command works, that suggests a bug in how mise use applies per-tool options during initial resolution.
+yes, that appears to be the case, only second option works.
+
+That strongly suggests a bug in mise use, specifically in the order in which it applies tool options during initial version resolution.
+
+Your observation indicates that:
+
+    --tool-option minimum_release_age=0s persists the correct per-tool setting.
+
+    mise use apparently resolves the initial version using the global release-age setting.
+
+    --minimum-release-age=0s explicitly overrides that resolution, producing the expected result.
+
+The 
+mise documentation
+ 
+supports per-tool minimum_release_age, and the 
+use implementation
+ 
+exposes both flags. 
+GitHub
++1
+
+I haven't confirmed the precise code path, but your reproduction is compelling.
+
+I'd report this as a bug in 
+jdx/mise
+, with these two commands as the minimal reproduction:
+
+# Unexpected: initial version respects global age
+mise use -g --tool-option minimum_release_age=0s github:Kpler/kp-cli
+
+# Expected: initial version ignores global age
+mise use -g --minimum-release-age=0s \
+  --tool-option minimum_release_age=0s github:Kpler/kp-cli
+
+Include your mise --version and global minimum_release_age setting. This looks like a good candidate for a regression test.
+give me full bug report/fix instructions
+Stopped thinking
+
+I’ll check the current mise code and issue history, then put together a ready-to-file bug report and concrete implementation/test instructions.
+
+give m
+</pasted_content id="15da">
+
+---
+
+just do the fix (new branch) then create a pr. don't mention the internal/Kpler command/tool.
